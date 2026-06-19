@@ -47,7 +47,7 @@ const MessageBubble = ({ message, isOwn, showAvatar, apiUrl }) => {
             <div className={styles.imageWrap}>
               <img
                 src={`${apiUrl}${message.imageUrl}`}
-                alt="Shared image"
+                alt={message.content && message.content !== "📸 Photo" ? message.content : ""}
                 className={`${styles.sharedImage} ${imgExpanded ? styles.sharedImageExpanded : ""}`}
                 onClick={() => setImgExpanded(!imgExpanded)}
               />

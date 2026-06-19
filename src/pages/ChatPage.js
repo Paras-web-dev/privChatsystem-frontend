@@ -60,7 +60,7 @@ const ChatPage = () => {
       }
     };
     load();
-  }, [token]);
+  }, [token, loadMessages]);
 
   // Load other user info
   useEffect(() => {
@@ -81,7 +81,7 @@ const ChatPage = () => {
   // Mark messages read when focused
   useEffect(() => {
     markRead();
-  }, [messages.length]);
+  }, [messages.length, markRead]);
 
   // Show chat cleared banner
   useEffect(() => {
