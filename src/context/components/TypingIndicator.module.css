@@ -1,0 +1,65 @@
+/* ── TypingIndicator.module.css ────────────────────────────────────────── */
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 4px 0;
+  animation: slideInUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.avatarPlaceholder {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0f2027 0%, #2c5364 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 15px;
+  border: 2.5px solid #00bfa5;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,191,165,0.2);
+}
+
+.wrap { display: flex; flex-direction: column; gap: 4px; }
+
+.label {
+  font-size: 11px;
+  color: #00897b;
+  font-weight: 700;
+  margin-left: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bubble {
+  background: white;
+  border: 1px solid #c8e8e8;
+  border-radius: 20px 20px 20px 4px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #00bfa5;
+  animation: dotBounce 1.2s ease-in-out infinite;
+  opacity: 0.9;
+}
+
+@keyframes dotBounce {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50% { transform: translateY(-8px); opacity: 1; }
+}
