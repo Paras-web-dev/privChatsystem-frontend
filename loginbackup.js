@@ -4,7 +4,7 @@ import AuthLayout from "./AuthLayout";
 import styles from "./LoginPage.module.css";
 
 const LoginPage = ({ onNavigateRegister }) => {
-  const { login, clearError } = useAuth();
+  const { login, error } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -12,38 +12,15 @@ const LoginPage = ({ onNavigateRegister }) => {
   const [showPass, setShowPass] = useState(false);
   const [shake, setShake] = useState(false);
 
-  // ✅ NEW: track if this is a "already logged in" 409 error
-  const [isAlreadyLoggedIn, setIsAlreadyLoggedIn] = useState(false);
-
   const showError = (message) => {
     setLocalError(message);
     setShake(true);
     setTimeout(() => setShake(false), 600);
   };
 
-  // ✅ FIX: clear error when user starts typing
-  const handleIdentifierChange = (e) => {
-    setIdentifier(e.target.value);
-    if (localError) {
-      setLocalError("");
-      setIsAlreadyLoggedIn(false);
-      clearError();
-    }
-  };
-
-  const handlePasswordChange = (e) => {
-    setPassword(e.target.value);
-    if (localError) {
-      setLocalError("");
-      setIsAlreadyLoggedIn(false);
-      clearError();
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLocalError("");
-    setIsAlreadyLoggedIn(false);
 
     if (!identifier.trim() || !password.trim()) {
       showError("Please fill in all fields");
@@ -55,10 +32,6 @@ const LoginPage = ({ onNavigateRegister }) => {
     setLoading(false);
 
     if (!result.success) {
-      // ✅ FIX: handle 409 (already logged in) differently
-      if (result.status === 409) {
-        setIsAlreadyLoggedIn(true);
-      }
       showError(result.message || "Login failed");
     }
   };
@@ -78,9 +51,8 @@ const LoginPage = ({ onNavigateRegister }) => {
               type="text"
               placeholder="email or username"
               value={identifier}
-              onChange={handleIdentifierChange}
+              onChange={(e) => setIdentifier(e.target.value)}
               autoComplete="username"
-              disabled={loading}
             />
           </div>
         </div>
@@ -94,9 +66,8 @@ const LoginPage = ({ onNavigateRegister }) => {
               type={showPass ? "text" : "password"}
               placeholder="password"
               value={password}
-              onChange={handlePasswordChange}
+              onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              disabled={loading}
             />
             <button
               type="button"
@@ -108,38 +79,10 @@ const LoginPage = ({ onNavigateRegister }) => {
           </div>
         </div>
 
-        {/* ✅ FIX: show special message for 409 already-logged-in error */}
-        {localError && (
-          <div className={`${styles.error} ${isAlreadyLoggedIn ? styles.errorWarning : ""}`}>
-            {isAlreadyLoggedIn ? (
-              <>
-                🔒 {localError}
-                <div className={styles.errorHint}>
-                  Log out from the other device first, then try again.
-                </div>
-              </>
-            ) : (
-              localError
-            )}
-          </div>
-        )}
+        {(localError || error) && <div className={styles.error}>{localError || error}</div>}
 
-        {/* ✅ FIX: show server connecting state during cold start */}
-        {loading && (
-          <div className={styles.connectingHint}>
-            ⏳ Connecting to server, please wait...
-          </div>
-        )}
-
-        <button
-          type="submit"
-          className={styles.submitBtn}
-          disabled={loading || !identifier.trim() || !password.trim()}
-        >
-          {loading
-            ? <><span className={styles.spinner} /> Signing in...</>
-            : "Sign In"
-          }
+        <button type="submit" className={styles.submitBtn} disabled={loading}>
+          {loading ? <><span className={styles.spinner} /> Signing in...</> : "Sign In"}
         </button>
       </form>
 
@@ -150,7 +93,7 @@ const LoginPage = ({ onNavigateRegister }) => {
 
       <div className={styles.footer}>
         <span className={styles.footerDot} />
-        Safe conversations start here
+       '' Safe conversations Starts here "
         <span className={styles.footerDot} />
       </div>
     </AuthLayout>

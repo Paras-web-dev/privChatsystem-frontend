@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
@@ -18,13 +18,8 @@ export const SocketProvider = ({ children }) => {
   const [onlineStatus, setOnlineStatus] = useState({});
   const [chatCleared, setChatCleared] = useState(false);
 
-  // ✅ FIX 2: use stable primitives, not the whole user object
-  const userId = user?.id || user?._id;
-  const username = user?.username;
-  const userRole = user?.role;
-
   useEffect(() => {
-    if (!token || !userId) {
+    if (!token || !user) {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -54,19 +49,20 @@ export const SocketProvider = ({ children }) => {
 
     socket.on("receive_message", (msg) => {
       setMessages((prev) => {
+        // Avoid duplicates
         if (prev.some((m) => m._id === msg._id)) return prev;
         return [...prev, msg];
       });
     });
 
-    socket.on("typing_start", ({ username: typingUsername }) => {
-      if (typingUsername !== username) setTypingUser(typingUsername);
+    socket.on("typing_start", ({ username }) => {
+      if (username !== user.username) setTypingUser(username);
     });
 
     socket.on("typing_stop", () => setTypingUser(null));
 
-    socket.on("user_status", ({ userId: uid, isOnline }) => {
-      setOnlineStatus((prev) => ({ ...prev, [uid]: isOnline }));
+    socket.on("user_status", ({ userId, username, isOnline }) => {
+      setOnlineStatus((prev) => ({ ...prev, [userId]: isOnline }));
     });
 
     socket.on("force_disconnect", ({ message }) => {
@@ -75,7 +71,7 @@ export const SocketProvider = ({ children }) => {
     });
 
     socket.on("chat_cleared", () => {
-      if (userRole !== "admin") {
+      if (user.role !== "admin") {
         setMessages([]);
         setChatCleared(true);
         setTimeout(() => setChatCleared(false), 4000);
@@ -99,32 +95,31 @@ export const SocketProvider = ({ children }) => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, userId, username, userRole]); // ✅ FIX 2: stable primitives only
+  }, [token, user]);
 
-  // ✅ FIX 1: wrap all functions in useCallback so they never get recreated
-  const sendMessage = useCallback((content, type = "text", imageUrl = null) => {
+  const sendMessage = (content, type = "text", imageUrl = null) => {
     if (socketRef.current?.connected) {
       socketRef.current.emit("send_message", { content, type, imageUrl });
     }
-  }, []);
+  };
 
-  const sendTypingStart = useCallback(() => {
+  const sendTypingStart = () => {
     if (socketRef.current?.connected) socketRef.current.emit("typing_start");
-  }, []);
+  };
 
-  const sendTypingStop = useCallback(() => {
+  const sendTypingStop = () => {
     if (socketRef.current?.connected) socketRef.current.emit("typing_stop");
-  }, []);
+  };
 
-  const markRead = useCallback(() => {
+  const markRead = () => {
     if (socketRef.current?.connected) socketRef.current.emit("mark_read");
-  }, []);
+  };
 
-  const triggerNGT = useCallback(() => {
+  const triggerNGT = () => {
     if (socketRef.current?.connected) socketRef.current.emit("ngt_triggered");
-  }, []);
+  };
 
-  const loadMessages = useCallback((msgs) => setMessages(msgs), []);
+  const loadMessages = (msgs) => setMessages(msgs);
 
   return (
     <SocketContext.Provider

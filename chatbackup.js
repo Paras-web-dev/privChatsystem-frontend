@@ -26,90 +26,68 @@ const ChatPage = () => {
   const [imgUploading, setImgUploading] = useState(false);
   const [chatClearedBanner, setChatClearedBanner] = useState(false);
 
-  // ✅ FIX: track if messages already loaded — prevents calling API more than once
-  const messagesFetched = useRef(false);
-
   const messagesEndRef = useRef(null);
   const typingTimerRef = useRef(null);
   const fileInputRef = useRef(null);
-
-  // ✅ Stable user ID — avoids object reference issues in useEffect deps
-  const userId = user?._id || user?.id;
 
   // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUser]);
 
-  // ✅ FIX: Load message history ONCE only — not on every loadMessages reference change
+  // Load message history
   useEffect(() => {
-    if (!token || messagesFetched.current) return;
-    messagesFetched.current = true;
-
     const load = async () => {
       try {
         const res = await axios.get(`${API}/api/messages`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        loadMessages(
-          res.data.map((m) => ({
-            _id: m._id,
-            sender: m.sender?._id || m.sender,
-            senderName: m.senderName,
-            senderRole: m.senderRole,
-            senderAvatar: m.sender?.avatar || null,
-            content: m.content,
-            type: m.type,
-            imageUrl: m.imageUrl,
-            timestamp: m.timestamp,
-            isRead: m.isRead,
-            hiddenFromUser: m.hiddenFromUser,
-          }))
-        );
+        loadMessages(res.data.map((m) => ({
+          _id: m._id,
+          sender: m.sender._id,
+          senderName: m.senderName,
+          senderRole: m.senderRole,
+          senderAvatar: m.sender.avatar,
+          content: m.content,
+          type: m.type,
+          imageUrl: m.imageUrl,
+          timestamp: m.timestamp,
+          isRead: m.isRead,
+          hiddenFromUser: m.hiddenFromUser,
+        })));
       } catch (err) {
         console.error("Load messages error:", err);
-        // ✅ Reset flag so user can try again on reconnect
-        messagesFetched.current = false;
       }
     };
     load();
   }, [token, loadMessages]);
 
-  // ✅ FIX: Load other user info — use stable userId string, not whole user object
+  // Load other user info
   useEffect(() => {
-    if (!token || !userId) return;
-
     const fetchUsers = async () => {
       try {
         const res = await axios.get(`${API}/api/auth/users`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const other = res.data.find((u) => u._id !== userId);
-        setOtherUser(other || null);
+        const other = res.data.find((u) => u._id !== user._id);
+        setOtherUser(other);
       } catch (err) {
         console.error("Fetch users error:", err);
       }
     };
     fetchUsers();
-  }, [token, userId]);
+  }, [token, user._id]);
 
-  // ✅ FIX: markRead — removed markRead from deps to stop infinite socket emit loop
-  // Only runs when message count actually changes
-  const markReadRef = useRef(markRead);
+  // Mark messages read when focused
   useEffect(() => {
-    markReadRef.current = markRead;
-  }, [markRead]);
-
-  useEffect(() => {
-    markReadRef.current();
-  }, [messages.length]);
+    markRead();
+  }, [messages.length, markRead]);
 
   // Show chat cleared banner
   useEffect(() => {
     if (chatCleared) {
       setChatClearedBanner(true);
-      const t = setTimeout(() => setChatClearedBanner(false), 4000);
-      return () => clearTimeout(t);
+      setTimeout(() => setChatClearedBanner(false), 4000);
     }
   }, [chatCleared]);
 
@@ -156,38 +134,34 @@ const ChatPage = () => {
           "Content-Type": "multipart/form-data",
         },
       });
-      // ✅ Send proper imageUrl that backend gave us
       sendMessage("📸 Photo", "image", res.data.imageUrl);
     } catch (err) {
       console.error("Image upload error:", err);
-      alert("Image upload failed. Please try again.");
     } finally {
       setImgUploading(false);
       e.target.value = "";
     }
   };
 
-  const handleLogout = useCallback(() => {
-    // ✅ Reset fetch flag on logout so next login loads fresh messages
-    messagesFetched.current = false;
+  const handleLogout = () => {
     logout();
-  }, [logout]);
+  };
 
   const downloadChatAsPDF = async () => {
     try {
-      if (messages.length === 0) {
+      const element = document.querySelector(`.${styles.messagesArea}`);
+      if (!element || messages.length === 0) {
         alert("No messages to download");
         return;
       }
 
+      // Create a temporary container for PDF content
       const pdfContainer = document.createElement("div");
       pdfContainer.style.padding = "20px";
       pdfContainer.style.backgroundColor = "#fff";
       pdfContainer.style.width = "800px";
-      pdfContainer.style.position = "fixed";
-      pdfContainer.style.top = "-9999px";
-      pdfContainer.style.left = "-9999px";
 
+      // Add title
       const title = document.createElement("h1");
       title.textContent = `Chat with ${otherUser?.username || "User"}`;
       title.style.textAlign = "center";
@@ -195,6 +169,7 @@ const ChatPage = () => {
       title.style.fontSize = "20px";
       pdfContainer.appendChild(title);
 
+      // Add date
       const dateText = document.createElement("p");
       dateText.textContent = `Downloaded: ${new Date().toLocaleString()}`;
       dateText.style.textAlign = "center";
@@ -203,6 +178,7 @@ const ChatPage = () => {
       dateText.style.fontSize = "12px";
       pdfContainer.appendChild(dateText);
 
+      // Add messages
       messages.forEach((msg) => {
         const msgDiv = document.createElement("div");
         msgDiv.style.marginBottom = "15px";
@@ -210,8 +186,9 @@ const ChatPage = () => {
         msgDiv.style.backgroundColor = "#f5f5f5";
         msgDiv.style.borderRadius = "8px";
 
-        const isOwn = msg.sender === userId || msg.senderName === user.username;
+        const isOwn = msg.sender === user._id || msg.senderName === user.username;
 
+        // Sender info
         const senderInfo = document.createElement("div");
         senderInfo.style.fontWeight = "bold";
         senderInfo.style.marginBottom = "5px";
@@ -220,13 +197,15 @@ const ChatPage = () => {
         senderInfo.textContent = `${msg.senderName} (${msg.senderRole || "user"})`;
         msgDiv.appendChild(senderInfo);
 
+        // Message content
         const contentDiv = document.createElement("div");
         contentDiv.style.fontSize = "14px";
         contentDiv.style.wordBreak = "break-word";
         contentDiv.style.whiteSpace = "pre-wrap";
-        contentDiv.textContent = msg.type === "image" ? "[Image]" : msg.content;
+        contentDiv.textContent = msg.content;
         msgDiv.appendChild(contentDiv);
 
+        // Timestamp
         const timeDiv = document.createElement("div");
         timeDiv.style.fontSize = "11px";
         timeDiv.style.color = "#999";
@@ -237,7 +216,7 @@ const ChatPage = () => {
         pdfContainer.appendChild(msgDiv);
       });
 
-      // ✅ FIX: append off-screen, not to body directly (cleaner)
+      // Temporarily add to DOM for canvas rendering
       document.body.appendChild(pdfContainer);
 
       const canvas = await html2canvas(pdfContainer, {
@@ -246,10 +225,16 @@ const ChatPage = () => {
         useCORS: true,
       });
 
+      // Remove temporary element
       document.body.removeChild(pdfContainer);
 
+      // Generate PDF
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
 
       const imgWidth = 210;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
@@ -266,7 +251,8 @@ const ChatPage = () => {
         heightLeft -= 297;
       }
 
-      const fileName = `chat_${otherUser?.username || "export"}_${Date.now()}.pdf`;
+      // Download PDF
+      const fileName = `chat_${otherUser?.username || "export"}_${new Date().getTime()}.pdf`;
       pdf.save(fileName);
     } catch (err) {
       console.error("PDF download error:", err);
@@ -274,11 +260,7 @@ const ChatPage = () => {
     }
   };
 
-  // ✅ FIX: compare using stable userId string, not object reference
-  const isOwnMessage = useCallback(
-    (msg) => msg.sender === userId || msg.senderName === user.username,
-    [userId, user.username]
-  );
+  const isOwnMessage = (msg) => msg.sender === user._id || msg.senderName === user.username;
 
   return (
     <div className={styles.root}>
@@ -358,6 +340,7 @@ const ChatPage = () => {
 
       {/* ── Messages area ───────────────────────────────────────────────── */}
       <div className={styles.messagesArea}>
+        {/* Empty state */}
         {messages.length === 0 && (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>💬</div>
@@ -366,6 +349,7 @@ const ChatPage = () => {
           </div>
         )}
 
+        {/* Messages */}
         {messages.map((msg, idx) => (
           <MessageBubble
             key={msg._id || idx}
@@ -378,16 +362,19 @@ const ChatPage = () => {
           />
         ))}
 
+        {/* Typing indicator */}
         {typingUser && <TypingIndicator username={typingUser} />}
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* ── Input bar ───────────────────────────────────────────────────── */}
       <div className={styles.inputBar}>
+        {/* Image upload */}
         <button
           className={styles.attachBtn}
           onClick={() => fileInputRef.current?.click()}
-          disabled={imgUploading || !connected}
+          disabled={imgUploading}
           title="Send image"
         >
           {imgUploading ? "⏳" : "📎"}
@@ -400,25 +387,26 @@ const ChatPage = () => {
           onChange={handleImageUpload}
         />
 
+        {/* Text input */}
         <textarea
           className={styles.textInput}
-          placeholder={connected ? "Type a message..." : "Connecting..."}
+          placeholder="Type a message..."
           value={input}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           rows={1}
-          disabled={!connected}
         />
 
+        {/* Emoji quick-insert */}
         <button
           className={styles.emojiBtn}
           onClick={() => setInput((prev) => prev + "😊")}
           title="Add emoji"
-          disabled={!connected}
         >
           😊
         </button>
 
+        {/* Send */}
         <button
           className={`${styles.sendBtn} ${input.trim() && connected ? styles.sendBtnActive : ""}`}
           onClick={handleSend}
